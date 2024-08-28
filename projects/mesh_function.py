@@ -1,6 +1,6 @@
 import numpy as np
 #from numpy import *
-import matplotlib as plt
+import matplotlib.pyplot as plt
 #from matplotlib.pyplot import *
 
 
@@ -25,15 +25,17 @@ def test_mesh_function():
     fun = mesh_function(func, t)
     assert np.allclose(fun, f)
 
-def plot_mesh_function(f, t, dt):
-    dt=0.1 
-    x=np.linspace(0,t,dt)
-    y= mesh_function(f,t)
+def plot_mesh_function(f, t):
+    N=100
+    x=np.linspace(0,t,N)
+    y= mesh_function(f, x)
 
-    plot(t,f, 'r--o', x, y)
+    plt.plot(x,y, 'r--o')
     plt.xlabel("$t$")
     plt.ylabel(r"$\exp(x)$")
     plt.show()
 
 if __name__ == "__main__":
     test_mesh_function()
+    t = np.linspace(0, 10, 100)
+    plot_mesh_function(func, 10)
