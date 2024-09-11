@@ -197,16 +197,19 @@ class VibFD4(VibSolver):
         assert T.is_integer() and T % 2 == 0
 
     def __call__(self):
-        g=-30+12*self.w**2*self.dt**2
-        A= sparse.diags([-1,16,g,16,-1], np.array([-2,-1,0,1,2]),(self.Nt+1, self.Nt+1), 'lil')
-        A *= (1/(12*self.dt**2))
-        b = np.zeros(self.Nt+1)
-        A[1, :6] = 10, -15, -4, 14, -6, 1
+        D2 = sparse.diags([-1, 16, -30, 16, -1], [-2, -1, 0, 1, 2], (self.Nt+1, self.Nt+1), 'lil')
+        D2[1, :6] = np.array([10, -15, -4, 14, -6, 1])
+        D2[-2, -6:] = np.array([10, -15, -4, 14, -6, 1])[::-1]
+        D2[0, :6] = np.array([45, -154, 214, -156, 61, -10])         # not used
+        D2[-1, -6:] = np.array([45, -154, 214, -156, 61, -10])[::-1] # not used
+        D2 *= (1/(12*self.dt**2))
+        A= D2 + self.w**2*sparse.eye(self.Nt+1).tolil()
+        b=np.zeros(self.Nt+1)
         A[0, :6] = 1, 0, 0, 0, 0, 0
-        A[-2, -6:]= 1, -6, 14, -4, -15, 10
-        A[-1, -6:] = 0, 0, 0, 0, 0, 1 
-        b[0], b[-1] = self.I, self.I
-        u= sparse.linalg.spsolve(A.tocsr(),b)
+        A[-1, -6:] = 0, 0, 0, 0, 0, 1
+        b[0] = self.I
+        b[-1] = self.I
+        u = sparse.linalg.spsolve(A.tocsr(), b)
         return u
     
     class VibFD5(VibFD2):
@@ -238,6 +241,4 @@ def test_order():
     VibFD4(8, 2*np.pi/w, w).test_order(N0=20)
 
 if __name__ == '__main__':
-    #test_order()
-    a = VibFD4(8, 2*np.pi/0.35, 0.35)
-    b = a()
+    test_order()
