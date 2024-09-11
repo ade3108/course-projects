@@ -10,6 +10,7 @@ We use various boundary conditions.
 import numpy as np
 import matplotlib.pyplot as plt
 import sympy as sp
+from scipy import sparse
 
 t = sp.Symbol('t')
 
@@ -141,8 +142,17 @@ class VibFD2(VibSolver):
         assert T.is_integer() and T % 2 == 0
 
     def __call__(self):
-        u = np.zeros(self.Nt+1)
+        g=2-self.w**2*self.dt**2
+        A= sparse.diags([1,-g,1], np.array([-1,0,1]),(self.Nt+1, self.Nt+1), 'lil')
+        A *= (1/self.dt**2)
+        b = np.zeros(self.Nt+1)
+        A[0, :3] = 1, 0, 0 
+        A[-1, -3:] = 0, 0, 1 
+        b[0], b[-1] = self.I, self.I
+        u= sparse.linalg.spsolve(A.tocsr(),b)
         return u
+
+
 
 class VibFD3(VibSolver):
     """
@@ -161,10 +171,18 @@ class VibFD3(VibSolver):
         assert T.is_integer() and T % 2 == 0
 
     def __call__(self):
-        u = np.zeros(self.Nt+1)
+        g=2-self.w**2*self.dt**2
+        A= sparse.diags([1,-g,1], np.array([-1,0,1]),(self.Nt+1, self.Nt+1), 'lil')
+        A *= (1/self.dt**2)
+        b = np.zeros(self.Nt+1)
+        A[0, :3] = 1, 0, 0 
+        A[-1, -3:] = np.array([-1, 4, -3])/(2*self.dt)
+        b[0]= self.I
+        b[-1]= 0
+        u= sparse.linalg.spsolve(A.tocsr(),b)
         return u
 
-class VibFD4(VibFD2):
+class VibFD4(VibSolver):
     """
     Fourth order accurate solver using boundary conditions::
 
@@ -173,10 +191,44 @@ class VibFD4(VibFD2):
     The boundary conditions require that T = n*pi/w, where n is an even integer.
     """
     order = 4
+    def __init__(self, Nt, T, w=0.35, I=1):
+        VibSolver.__init__(self, Nt, T, w, I)
+        T = T * w / np.pi
+        assert T.is_integer() and T % 2 == 0
 
     def __call__(self):
-        u = np.zeros(self.Nt+1)
+        g=-30+12*self.w**2*self.dt**2
+        A= sparse.diags([-1,16,g,16,-1], np.array([-2,-1,0,1,2]),(self.Nt+1, self.Nt+1), 'lil')
+        A *= (1/(12*self.dt**2))
+        b = np.zeros(self.Nt+1)
+        A[1, :6] = 10, -15, -4, 14, -6, 1
+        A[0, :6] = 1, 0, 0, 0, 0, 0
+        A[-2, -6:]= 1, -6, 14, -4, -15, 10
+        A[-1, -6:] = 0, 0, 0, 0, 0, 1 
+        b[0], b[-1] = self.I, self.I
+        u= sparse.linalg.spsolve(A.tocsr(),b)
         return u
+    
+    class VibFD5(VibFD2):
+        def __init__(self, Nt, T, w=0.35, I=1):
+            VibSolver.__init__(self, Nt, T, w, I)
+
+        def ue(self):
+            #return sp.exp(sp.sin(t))
+            return t**4
+        
+        def __call__(self):
+            g=2-self.w**2*self.dt**2
+            A= sparse.diags([1,-g,1], np.array([-1,0,1]),(self.Nt+1, self.Nt+1), 'lil')
+            A *= (1/self.dt**2)
+            ue= self.ue()
+            f= ue.diff(t,2) + self.w**2*ue
+            b = sp.lambdify(t,f)(self.t)
+            A[0, :3] = 1, 0, 0 
+            A[-1, -3:] = 0, 0, 1 
+            b[0], b[-1] = self.ue().subs(t,0), self.ue().subs(t, self.T)
+            u= sparse.linalg.spsolve(A.tocsr(),b)
+            return u
 
 def test_order():
     w = 0.35
@@ -186,4 +238,6 @@ def test_order():
     VibFD4(8, 2*np.pi/w, w).test_order(N0=20)
 
 if __name__ == '__main__':
-    test_order()
+    #test_order()
+    a = VibFD4(8, 2*np.pi/0.35, 0.35)
+    b = a()
