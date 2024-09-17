@@ -47,10 +47,11 @@ class Wave1D:
         """
         D = sparse.diags([1, -2, 1], [-1, 0, 1], (self.N+1, self.N+1), 'lil')
         if bc == 1: # Neumann condition is baked into stencil
-            raise NotImplementedError
+            D[0, :3] = -2, 2, 0
+            D[-1, -3:] = 0, 2, -2
 
         elif bc == 3: # periodic (Note u[0] = u[-1])
-            raise NotImplementedError
+            D[0, -2] = 1
 
         return D
 
@@ -77,12 +78,16 @@ class Wave1D:
 
         elif bc == 1: # Neumann condition
             pass
+            
+
 
         elif bc == 2: # Open boundary
-            raise NotImplementedError
+            C= self.cfl
+            u[0] = 2*(1-C)*self.un[0] - (1-C)/(1+C)*self.unm1[0] + 2*C**2/(1+C)*self.un[1]
+            u[-1] = 2*(1-C)*self.un[-1] - (1-C)/(1+C)*self.unm1[-1] + 2*C**2/(1+C)*self.un[-2]
 
         elif bc == 3:
-            raise NotImplementedError
+            u[-1]= u[0]
 
         else:
             raise RuntimeError(f"Wrong bc = {bc}")
@@ -132,9 +137,14 @@ class Wave1D:
             u0 = sp.lambdify(x, self.u0.subs({L: self.L, c: self.c, t: dt}))
             self.un[:] = u0(self.x)
 
-        else: # use u_t = 0 for un = u(x, dt)
+        elif ic == 1: # use u_t = 0 and PDE for un = u(x, dt)
             self.un[:] = self.unm1 + 0.5*C**2* (D @ self.unm1)
             self.apply_bcs(bc, self.un)
+        
+        else: # use u_t = 0 and I(x) for un = u(x, dt)
+            u0 = sp.lambdify(x, self.u0.subs({L: self.L, c: self.c, t: 0}))
+            self.un[:] = 0.5*(u0(self.x+self.c*dt)+u0(self.x-self.c*dt))
+
         if save_step == 1:
             plotdata[1] = self.un.copy()
 
